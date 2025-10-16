@@ -1,0 +1,60 @@
+Metadata-Version: 2.4
+Name: personal-knowledge-chatbot-backend
+Version: 0.1.0
+Summary: FastAPI backend for personal knowledge base QA robot
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.111.0
+Requires-Dist: uvicorn[standard]>=0.30.0
+Requires-Dist: python-multipart>=0.0.9
+Requires-Dist: pydantic-settings>=2.3.0
+Requires-Dist: aiofiles>=23.2.1
+Requires-Dist: langchain>=0.2.12
+Requires-Dist: langchain-community>=0.2.11
+Requires-Dist: langchain-openai>=0.1.21
+Requires-Dist: chromadb>=0.5.5
+Requires-Dist: pypdf>=4.2.0
+Requires-Dist: tiktoken>=0.7.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3.2; extra == "dev"
+Requires-Dist: httpx>=0.27.0; extra == "dev"
+Requires-Dist: anyio>=4.4.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.8; extra == "dev"
+Requires-Dist: ruff>=0.5.7; extra == "dev"
+
+## Backend Setup
+
+### 1. Create a virtual environment
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+pip install --upgrade pip
+pip install -e .[dev]
+```
+
+### 2. Configure environment variables
+Copy `.env.example` to `.env` and provide your OpenAI credentials. Key fields:
+```
+PKB_OPENAI_API_KEY=sk-xxxx
+PKB_CHAT_MODEL=gpt-4o-mini
+PKB_EMBEDDING_MODEL=text-embedding-3-small
+PKB_CHUNK_SIZE=800
+PKB_CHUNK_OVERLAP=200
+PKB_MAX_UPLOAD_SIZE_MB=15
+```
+
+### 3. Run the server
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 4. API summary
+- `POST /api/upload` – ingest PDF/TXT files, chunk with LangChain, embed, and persist to Chroma.
+- `GET /api/knowledge-base` – list ingested documents and metadata.
+- `POST /api/qa` – stream an answer generated from retrieved context.
+
+### 5. Testing
+```bash
+pytest
+```
