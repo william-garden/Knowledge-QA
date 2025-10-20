@@ -32,6 +32,25 @@ class MetadataStore:
             self._write(payload)
         return payload
 
+    def remove(self, document_id: str) -> KnowledgeDocument | None:
+        with self._lock:
+            documents = self.list()
+            removed: KnowledgeDocument | None = None
+            remaining: list[KnowledgeDocument] = []
+            for document in documents:
+                if document.id == document_id:
+                    removed = document
+                else:
+                    remaining.append(document)
+            if removed is None:
+                return None
+            self._write(remaining)
+            return removed
+
+    def clear(self) -> None:
+        with self._lock:
+            self._write([])
+
     def _write(self, documents: Iterable[KnowledgeDocument]) -> None:
         serializable = [
             document.model_dump(mode="json") for document in documents

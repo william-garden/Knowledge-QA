@@ -8,6 +8,7 @@ class KnowledgeDocument(BaseModel):
     size: int = Field(ge=0)
     chunk_count: int = Field(ge=0)
     ingested_at: datetime
+    source_path: str | None = None
 
 
 class UploadResponse(BaseModel):
@@ -16,3 +17,7 @@ class UploadResponse(BaseModel):
 
 class KnowledgeListResponse(BaseModel):
     documents: list[KnowledgeDocument]
+
+
+class KnowledgeChunksResponse(BaseModel):
+    chunks: list[str]

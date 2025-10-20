@@ -102,7 +102,8 @@ async def _process_single_upload(
         filename=upload.filename or file_path.name,
         size=size,
         chunk_count=len(documents),
-        ingested_at=datetime.now(timezone.utc)
+        ingested_at=datetime.now(timezone.utc),
+        source_path=str(file_path)
     )
 
 

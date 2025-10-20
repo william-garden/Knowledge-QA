@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     uploads_dir: Path = Field(default=Path("storage/uploads"))
     chroma_dir: Path = Field(default=Path("storage/chroma"))
     metadata_file: Path = Field(default=Path("storage/metadata.json"))
+    conversations_file: Path = Field(default=Path("storage/conversations.json"))
 
     openai_api_key: str | None = None
     api_base: str = "https://ark.cn-beijing.volces.com/api/v3"
@@ -32,6 +33,13 @@ class Settings(BaseSettings):
         self.metadata_file = self.metadata_file if self.metadata_file.is_absolute() else Path.cwd() / self.metadata_file
         if not self.metadata_file.parent.exists():
             self.metadata_file.parent.mkdir(parents=True, exist_ok=True)
+        self.conversations_file = (
+            self.conversations_file
+            if self.conversations_file.is_absolute()
+            else Path.cwd() / self.conversations_file
+        )
+        if not self.conversations_file.parent.exists():
+            self.conversations_file.parent.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def _ensure_dir(path: Path) -> Path:

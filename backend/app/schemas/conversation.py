@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+DEFAULT_CONVERSATION_TITLE = "New conversation"
+
+
+class ConversationMessage(BaseModel):
+    id: str
+    role: Literal["user", "assistant", "system"]
+    content: str = Field(..., min_length=1)
+    created_at: datetime
+
+
+class Conversation(BaseModel):
+    id: str
+    title: str = Field(default=DEFAULT_CONVERSATION_TITLE)
+    created_at: datetime
+    updated_at: datetime
+    messages: list[ConversationMessage] = Field(default_factory=list)
+
+
+class ConversationSummary(BaseModel):
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationSummary]
+
+
+class ConversationDetailResponse(BaseModel):
+    conversation: Conversation
+
+
+class ConversationCreateRequest(BaseModel):
+    title: str | None = None
+
+
+class ConversationRenameRequest(BaseModel):
+    title: str = Field(..., min_length=1)
