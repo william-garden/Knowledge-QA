@@ -1,15 +1,21 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { Send, Square } from "lucide-react";
+﻿import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Edit2, Eraser, Loader2, MoreHorizontal, Plus, Send, Square, Trash2 } from "lucide-react";
 import MessageBubble from "./MessageBubble";
 import type { ChatController } from "@/hooks/useChat";
 
-type ChatWindowProps = {
+interface ChatWindowProps {
   chat: ChatController;
-};
+}
 
 export default function ChatWindow({ chat }: ChatWindowProps) {
   const [input, setInput] = useState("");
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const activeConversation = useMemo(
+    () => chat.conversations.find((item) => item.id === chat.activeConversationId) ?? null,
+    [chat.conversations, chat.activeConversationId]
+  );
 
   useEffect(() => {
     const el = viewportRef.current;
@@ -17,52 +23,187 @@ export default function ChatWindow({ chat }: ChatWindowProps) {
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [chat.messages]);
 
+  useEffect(() => {
+    if (!isActionsOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
+        setIsActionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [isActionsOpen]);
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!input.trim()) return;
-    chat.ask(input.trim());
+    void chat.ask(input.trim());
     setInput("");
+  };
+
+  const handleRename = () => {
+    if (!chat.activeConversationId || !activeConversation) return;
+    const next = window.prompt(
+      "Enter a new title for this conversation:",
+      activeConversation.title
+    );
+    if (!next || !next.trim()) return;
+    void chat.renameConversation(chat.activeConversationId, next.trim());
+  };
+
+  const handleCreateConversation = () => {
+    setIsActionsOpen(false);
+    void chat.createConversation();
+  };
+
+  const handleDeleteConversation = () => {
+    setIsActionsOpen(false);
+    if (!chat.activeConversationId || !activeConversation) return;
+    if (
+      window.confirm(
+        `Delete conversation "${activeConversation.title}"? This cannot be undone.`
+      )
+    ) {
+      void chat.deleteConversation(chat.activeConversationId);
+    }
+  };
+
+  const handleClearConversations = () => {
+    setIsActionsOpen(false);
+    if (
+      chat.conversations.length === 0 ||
+      !window.confirm("Clear all conversations? This cannot be undone.")
+    ) {
+      return;
+    }
+    void chat.clearConversations();
   };
 
   return (
     <main className="flex flex-1 flex-col bg-slate-900/60">
-      <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-8 py-5 backdrop-blur">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-100">
-            Personal Knowledge Assistant
-          </h2>
-          <p className="text-sm text-slate-400">
-            Ask questions and get answers grounded in your private documents.
-          </p>
+      <header className="border-b border-slate-800 bg-slate-900/80 px-8 py-5 backdrop-blur">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-100">
+                Personal Knowledge Assistant
+              </h2>
+              <p className="text-sm text-slate-400">
+                Manage conversations and ask questions grounded in your private documents.
+              </p>
+            </div>
+            <div className="relative" ref={actionsRef}>
+              <button
+                type="button"
+                onClick={() => setIsActionsOpen((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-1  text-sm text-accent transition hover:bg-accent/20"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {isActionsOpen ? (
+                <div className="absolute right-0 z-400000 mt-2 w-32 rounded-lg border border-slate-700 bg-slate-900/95 p-2 shadow-xl">
+                  <button
+                    title='New conversation'
+                    type="button"
+                    onClick={handleCreateConversation}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800/70"
+                  >
+                    <Plus className="h-4 w-4 text-accent" />
+                    New
+                  </button>
+                  <button
+                    title='Delete current'
+                    type="button"
+                    onClick={handleDeleteConversation}
+                    disabled={!chat.activeConversationId}
+                    className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearConversations}
+                    disabled={chat.conversations.length === 0}
+                    className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Eraser className="h-4 w-4" />
+                    Clear all
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-slate-400">Active conversation:</label>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <select
+                  className="min-w-[220px] rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none"
+                  value={chat.activeConversationId ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (!value) return;
+                    void chat.selectConversation(value);
+                  }}
+                  disabled={chat.isLoadingConversations || chat.conversations.length === 0}
+                >
+                  {chat.conversations.length === 0 ? (
+                    <option value="">No conversations</option>
+                  ) : null}
+                  {chat.conversations.map((conversation) => (
+                    <option key={conversation.id} value={conversation.id}>
+                      {conversation.title}
+                    </option>
+                  ))}
+                </select>
+                {chat.isLoadingConversations ? (
+                  <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-accent" />
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={handleRename}
+                disabled={!chat.activeConversationId}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300 transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+                Rename
+              </button>
+              <span className="text-xs text-slate-500">
+                {chat.conversations.length} conversation(s)
+              </span>
+            </div>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-hidden">
-        <div
-          ref={viewportRef}
-          className="h-full space-y-4 overflow-y-auto px-8 py-6"
-        >
+        <div ref={viewportRef} className="h-full space-y-4 overflow-y-auto px-8 py-6">
+          {chat.isLoadingMessages ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
+              <div className="flex items-center gap-2 text-slate-300">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading conversation...
+              </div>
+            </div>
+          ) : null}
           {chat.messages.length === 0 ? (
             <div className="mt-24 flex flex-col items-center text-center text-slate-400">
               <p className="text-lg font-medium">Ready when you are</p>
               <p className="mt-2 max-w-xl text-sm text-slate-500">
-                Upload one or more files and then ask any question about their
-                content. The assistant will search the knowledge base and stream
-                a contextual answer.
+                Upload files, select a conversation, and ask any question about their content.
               </p>
             </div>
           ) : (
-            chat.messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))
+            chat.messages.map((message) => <MessageBubble key={message.id} message={message} />)
           )}
         </div>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="border-t border-slate-800 bg-slate-900/80 px-8 py-4"
-      >
+      <form onSubmit={handleSubmit} className="border-t border-slate-800 bg-slate-900/80 px-8 py-4">
         <div className="rounded-2xl border border-slate-700 bg-slate-900/90 p-3 focus-within:border-accent">
           <textarea
             rows={3}
@@ -73,7 +214,7 @@ export default function ChatWindow({ chat }: ChatWindowProps) {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 if (input.trim()) {
-                  chat.ask(input.trim());
+                  void chat.ask(input.trim());
                   setInput("");
                 }
               }

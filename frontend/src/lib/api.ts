@@ -1,9 +1,13 @@
-import { UploadResponse } from "@/types";
+import {
+  ConversationDetail,
+  ConversationListResponse,
+  KnowledgeChunksResponse,
+  UploadResponse
+} from "@/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/$/, "") ?? "/api";
 
 export async function fetchKnowledgeBase(): Promise<UploadResponse> {
-    console.log("API_BASE:", API_BASE);
   const response = await fetch(`${API_BASE}/knowledge-base`, {
     headers: { Accept: "application/json" }
   });
@@ -70,22 +74,29 @@ export function uploadFile(
 
 export async function streamAnswer(
   question: string,
+  conversationId: string | null,
   onMessage: (chunk: string) => void,
   signal?: AbortSignal
-): Promise<void> {
+): Promise<string | null> {
   const response = await fetch(`${API_BASE}/qa`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream"
     },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({
+      question,
+      conversation_id: conversationId ?? null
+    }),
     signal
   });
 
   if (!response.ok || !response.body) {
     throw new Error(`QA request failed: ${response.statusText}`);
   }
+
+  const resolvedConversationId =
+    response.headers.get("x-conversation-id") ?? conversationId ?? null;
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -140,5 +151,102 @@ export async function streamAnswer(
         onMessage(text);
       }
     }
+  }
+
+  return resolvedConversationId;
+}
+
+export async function deleteKnowledgeDocument(documentId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/knowledge-base/${documentId}`, {
+    method: "DELETE"
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete document: ${response.statusText}`);
+  }
+}
+
+export async function clearKnowledgeBase(): Promise<void> {
+  const response = await fetch(`${API_BASE}/knowledge-base`, {
+    method: "DELETE"
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to clear knowledge base: ${response.statusText}`);
+  }
+}
+
+export async function fetchDocumentChunks(documentId: string): Promise<KnowledgeChunksResponse> {
+  const response = await fetch(`${API_BASE}/knowledge-base/${documentId}/chunks`, {
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load document chunks: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function fetchConversations(): Promise<ConversationListResponse> {
+  const response = await fetch(`${API_BASE}/conversations`, {
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load conversations: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function createConversation(
+  payload: { title?: string | null }
+): Promise<ConversationDetail> {
+  const response = await fetch(`${API_BASE}/conversations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to create conversation: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getConversation(conversationId: string): Promise<ConversationDetail> {
+  const response = await fetch(`${API_BASE}/conversations/${conversationId}`, {
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load conversation: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function renameConversation(
+  conversationId: string,
+  title: string
+): Promise<ConversationDetail> {
+  const response = await fetch(`${API_BASE}/conversations/${conversationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title })
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to rename conversation: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteConversation(conversationId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/conversations/${conversationId}`, {
+    method: "DELETE"
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete conversation: ${response.statusText}`);
+  }
+}
+
+export async function clearConversations(): Promise<void> {
+  const response = await fetch(`${API_BASE}/conversations`, {
+    method: "DELETE"
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to clear conversations: ${response.statusText}`);
   }
 }
