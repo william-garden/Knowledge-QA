@@ -1,4 +1,4 @@
-## Backend Setup
+ï»¿## Backend Setup
 
 ### 1. Create a virtual environment
 ```bash
@@ -27,9 +27,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 4. API summary
-- `POST /api/upload` ¨C ingest PDF/TXT files, chunk with LangChain, embed, and persist to Chroma.
-- `GET /api/knowledge-base` ¨C list ingested documents and metadata.
-- `POST /api/qa` ¨C stream an answer generated from retrieved context.
+- `POST /api/upload` - ingest PDF/TXT files, chunk with LangChain, embed, and persist to Chroma.
+- `GET /api/knowledge-base` - list ingested documents and metadata.
+- `POST /api/qa` - stream an answer generated from retrieved context.
 
 ### 5. Testing
 ```bash

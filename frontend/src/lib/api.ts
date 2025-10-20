@@ -3,6 +3,7 @@ import { UploadResponse } from "@/types";
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/$/, "") ?? "/api";
 
 export async function fetchKnowledgeBase(): Promise<UploadResponse> {
+    console.log("API_BASE:", API_BASE);
   const response = await fetch(`${API_BASE}/knowledge-base`, {
     headers: { Accept: "application/json" }
   });
@@ -88,23 +89,56 @@ export async function streamAnswer(
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  let buffer = "";
+  let doneStreaming = false;
 
-  while (true) {
+  while (!doneStreaming) {
     const { value, done } = await reader.read();
-    if (done) break;
-    const text = decoder.decode(value, { stream: true });
-    text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .forEach((line) => {
-        if (line.startsWith("data:")) {
-          const payload = line.slice(5).trim();
-          if (payload === "[DONE]") {
-            return;
-          }
-          onMessage(payload);
-        }
-      });
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      const rawLine = buffer.slice(0, newlineIndex).replace(/\r$/, "");
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (!rawLine.startsWith("data:")) {
+        continue;
+      }
+
+      let payload = rawLine.slice(5);
+      if (payload.startsWith(" ")) {
+        payload = payload.slice(1);
+      }
+
+      if (payload === "[DONE]") {
+        doneStreaming = true;
+        break;
+      }
+
+      if (!payload) {
+        continue;
+      }
+
+      const text = payload.endsWith("\n") ? payload : `${payload}\n`;
+      onMessage(text);
+    }
+
+    if (done) {
+      doneStreaming = true;
+    }
+  }
+
+  if (buffer) {
+    const rawLine = buffer.replace(/\r$/, "");
+    if (rawLine.startsWith("data:")) {
+      let payload = rawLine.slice(5);
+      if (payload.startsWith(" ")) {
+        payload = payload.slice(1);
+      }
+      if (payload && payload !== "[DONE]") {
+        const text = payload.endsWith("\n") ? payload : `${payload}\n`;
+        onMessage(text);
+      }
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { streamAnswer } from "@/lib/api";
 import { ChatMessage } from "@/types";
@@ -13,10 +13,55 @@ const createMessage = (
   createdAt: Date.now()
 });
 
+const STORAGE_KEY = "pkb-chat-history";
+
+const safeParseMessages = (value: string | null): ChatMessage[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        if (
+          typeof item !== "object" ||
+          item === null ||
+          (item.role !== "assistant" && item.role !== "user") ||
+          typeof item.content !== "string"
+        ) {
+          return null;
+        }
+
+        return {
+          id:
+            typeof item.id === "string" && item.id.length > 0
+              ? item.id
+              : `${item.role}-${Date.now()}-${Math.random()
+                  .toString(16)
+                  .slice(2)}`,
+          role: item.role,
+          content: item.content,
+          createdAt:
+            typeof item.createdAt === "number" ? item.createdAt : Date.now()
+        } satisfies ChatMessage;
+      })
+      .filter((msg): msg is ChatMessage => msg !== null);
+  } catch {
+    return [];
+  }
+};
+
 export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === "undefined") return [];
+    return safeParseMessages(window.localStorage.getItem(STORAGE_KEY));
+  });
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  }, [messages]);
 
   const ask = useCallback(async (question: string) => {
     if (!question.trim()) return;

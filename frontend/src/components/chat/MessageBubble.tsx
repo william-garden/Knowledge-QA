@@ -1,5 +1,8 @@
-import { ChatMessage } from "@/types";
 import clsx from "clsx";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
+import { ChatMessage } from "@/types";
 
 type MessageBubbleProps = {
   message: ChatMessage;
@@ -26,11 +29,11 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         {message.content.length === 0 ? (
           <span className="text-slate-400">...</span>
         ) : (
-          message.content.split("\n").map((line, index) => (
-            <p key={index} className="whitespace-pre-wrap">
-              {line}
-            </p>
-          ))
+          <div className="markdown-body">
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
         )}
       </div>
     </div>

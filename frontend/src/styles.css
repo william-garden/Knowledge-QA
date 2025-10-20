@@ -15,3 +15,13 @@ body {
 * {
   box-sizing: border-box;
 }
+
+.markdown-body {
+  background-color: transparent !important;
+  color: inherit;
+}
+
+.markdown-body * {
+  background-color: transparent;
+  color: inherit;
+}

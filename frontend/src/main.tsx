@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import { Toaster } from "sonner";
 import App from "./App";
 import "./styles.css";
+import "github-markdown-css/github-markdown-dark.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

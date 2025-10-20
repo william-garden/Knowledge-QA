@@ -16,7 +16,11 @@ except ImportError:  # pragma: no cover
     np = None  # type: ignore
 
 import aiofiles
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+try:
+    # LangChain 1.0 moved splitters into dedicated package; keep fallback for older versions.
+    from langchain_text_splitters import RecursiveCharacterTextSplitter  # type: ignore
+except ImportError:  # pragma: no cover - fallback for LangChain < 1.0
+    from langchain.text_splitter import RecursiveCharacterTextSplitter  # type: ignore
 from langchain_community.document_loaders import PyMuPDFLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from starlette.concurrency import run_in_threadpool
@@ -53,6 +57,10 @@ async def _process_single_upload(
             detail=f"No textual content detected in {upload.filename}."
         )
 
+    logger = logging.getLogger("aaaaaa")
+    logger.info("-----", settings)
+
+
     vector_store = get_vector_store(settings)
     document_id = content_hash
 
@@ -77,17 +85,8 @@ async def _process_single_upload(
     logger.info("Prepared %s chunks for document %s", len(texts), upload.filename)
     if texts:
         sample = texts[0]
-        if isinstance(sample, str):
-            preview = sample[:64]
-        else:
-            preview = str(sample)[:64]
+        preview = sample[:64] if isinstance(sample, str) else str(sample)[:64]
         logger.info("First chunk type: %s sample: %s", type(sample).__name__, preview)
-
-        tracked_keywords = ["红细胞", "白细胞", "血红蛋白"]
-        for keyword in tracked_keywords:
-            matches = [text for text in texts if keyword in text]
-            if matches:
-                logger.info("Detected keyword '%s' in %s chunk(s). Example: %s", keyword, len(matches), matches[0][:80])
     else:
         logger.warning("No chunks were prepared for document %s", upload.filename)
 
