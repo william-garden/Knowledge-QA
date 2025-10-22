@@ -22,7 +22,7 @@ async def create_conversation(
     payload: ConversationCreateRequest,
     store: ConversationStore = Depends(get_conversation_store)
 ) -> ConversationDetailResponse:
-    conversation = store.create(payload.title)
+    conversation = store.create(provider=payload.provider, title=payload.title)
     return ConversationDetailResponse(conversation=conversation)
 
 

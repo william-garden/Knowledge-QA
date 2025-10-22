@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.provider import ConversationProvider
+
 DEFAULT_CONVERSATION_TITLE = "New conversation"
 
 
@@ -20,6 +22,7 @@ class Conversation(BaseModel):
     title: str = Field(default=DEFAULT_CONVERSATION_TITLE)
     created_at: datetime
     updated_at: datetime
+    provider: ConversationProvider = Field(default_factory=ConversationProvider)
     messages: list[ConversationMessage] = Field(default_factory=list)
 
 
@@ -28,6 +31,7 @@ class ConversationSummary(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
+    provider: ConversationProvider
 
 
 class ConversationListResponse(BaseModel):
@@ -40,6 +44,7 @@ class ConversationDetailResponse(BaseModel):
 
 class ConversationCreateRequest(BaseModel):
     title: str | None = None
+    provider: ConversationProvider
 
 
 class ConversationRenameRequest(BaseModel):

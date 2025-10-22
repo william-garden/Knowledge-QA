@@ -2,15 +2,17 @@
 
 import logging
 import re
-from functools import lru_cache
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Iterable
 
+import httpx
 from fastapi import HTTPException
+from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings
+from app.schemas.provider import ProviderRuntimeConfig
+from app.services.providers import stream_completion
 from app.services.vector_store import get_vector_store
 
 _HEADING_PATTERN = re.compile(r'^(?P<hashes>(?:#\s*){1,6})\s*(?P<title>\S.*)?$')
@@ -94,11 +96,9 @@ RESPONSE_PROMPT = ChatPromptTemplate.from_messages(
 async def stream_answer(
     question: str,
     settings: Settings,
+    provider: ProviderRuntimeConfig,
     top_k: int | None = None
 ) -> AsyncGenerator[str, None]:
-    if not settings.openai_api_key:
-        raise HTTPException(status_code=500, detail="LLM API key is not configured.")
-
     vector_store = get_vector_store(settings)
     limit = top_k or settings.top_k
     fetch_limit = max(limit * 2, limit + 4)
@@ -138,16 +138,26 @@ async def stream_answer(
         for index, doc in enumerate(documents)
     )
 
-    messages = RESPONSE_PROMPT.format_messages(question=question, context=context)
-    chat_model = _get_chat_model(settings.chat_model, settings.openai_api_key, settings.api_base)
+    prompt_messages = RESPONSE_PROMPT.format_messages(question=question, context=context)
+    openai_messages = _as_openai_messages(prompt_messages)
 
     buffer = ""
-    async for chunk in chat_model.astream(messages):
-        if chunk.content:
-            buffer += chunk.content
+    try:
+        async for chunk in stream_completion(provider, openai_messages):
+            if not chunk:
+                continue
+            buffer += chunk
             normalized_output, buffer = _drain_markdown_buffer(buffer)
             if normalized_output:
                 yield f"data: {normalized_output}\n\n"
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text
+        raise HTTPException(
+            status_code=exc.response.status_code,
+            detail=f"Provider request failed: {detail}"
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     if buffer:
         has_heading, formatted = _normalize_heading_line(buffer)
@@ -159,15 +169,34 @@ async def stream_answer(
     yield "data: [DONE]\n\n"
 
 
-@lru_cache(maxsize=1)
-def _get_chat_model(model: str, api_key: str | None, base_url: str) -> ChatOpenAI:
-    if not api_key:
-        raise HTTPException(status_code=500, detail="LLM API key is not configured.")
-    
-    return ChatOpenAI(
-        model=model,
-        streaming=True,
-        temperature=0.2,
-        api_key=api_key,
-        base_url=base_url
-    )
+def _as_openai_messages(messages: Iterable[BaseMessage]) -> list[dict[str, str]]:
+    converted: list[dict[str, str]] = []
+    for message in messages:
+        role = _map_role(getattr(message, "type", "user"))
+        content = _extract_content(message.content)
+        converted.append({"role": role, "content": content})
+    return converted
+
+
+def _map_role(message_type: str) -> str:
+    if message_type == "system":
+        return "system"
+    if message_type in {"ai", "assistant"}:
+        return "assistant"
+    return "user"
+
+
+def _extract_content(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text") or item.get("content")
+                if text:
+                    parts.append(str(text))
+            else:
+                parts.append(str(item))
+        return "\n".join(parts)
+    return str(content)

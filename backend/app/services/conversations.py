@@ -15,6 +15,7 @@ from app.schemas.conversation import (
     ConversationSummary,
     DEFAULT_CONVERSATION_TITLE,
 )
+from app.schemas.provider import ConversationProvider, DEFAULT_PROVIDER
 
 
 def _derive_title(content: str) -> str:
@@ -33,7 +34,12 @@ class ConversationStore:
             return []
         with self.path.open("r", encoding="utf-8") as file:
             payload = json.load(file)
-        return [Conversation.model_validate(item) for item in payload]
+        normalized: list[Conversation] = []
+        for item in payload:
+            if "provider" not in item or not isinstance(item["provider"], dict):
+                item["provider"] = DEFAULT_PROVIDER.model_dump(mode="json")
+            normalized.append(Conversation.model_validate(item))
+        return normalized
 
     def _write(self, conversations: Iterable[Conversation]) -> None:
         serializable = [
@@ -57,6 +63,7 @@ class ConversationStore:
                 title=item.title,
                 created_at=item.created_at,
                 updated_at=item.updated_at,
+                provider=item.provider,
             )
             for item in conversations
         ]
@@ -67,13 +74,14 @@ class ConversationStore:
                 return conversation
         return None
 
-    def create(self, title: str | None = None) -> Conversation:
+    def create(self, provider: ConversationProvider, title: str | None = None) -> Conversation:
         now = datetime.now(timezone.utc)
         conversation = Conversation(
             id=uuid4().hex,
             title=title.strip() if title and title.strip() else DEFAULT_CONVERSATION_TITLE,
             created_at=now,
             updated_at=now,
+            provider=provider,
             messages=[],
         )
         with self._lock:

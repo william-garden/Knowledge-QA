@@ -2,10 +2,16 @@ import {
   ConversationDetail,
   ConversationListResponse,
   KnowledgeChunksResponse,
+  ProviderRuntimeRequest,
   UploadResponse
 } from "@/types";
+import { isTauri } from "@/lib/runtime";
 
-const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/$/, "") ?? "/api";
+const DEFAULT_TAURI_API = "http://127.0.0.1:5178/api";
+
+const API_BASE =
+  import.meta.env.VITE_API_BASE?.replace(/\/$/, "") ??
+  (isTauri() ? DEFAULT_TAURI_API : "/api");
 
 export async function fetchKnowledgeBase(): Promise<UploadResponse> {
   const response = await fetch(`${API_BASE}/knowledge-base`, {
@@ -75,8 +81,10 @@ export function uploadFile(
 export async function streamAnswer(
   question: string,
   conversationId: string | null,
+  provider: ProviderRuntimeRequest,
   onMessage: (chunk: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  topK?: number
 ): Promise<string | null> {
   const response = await fetch(`${API_BASE}/qa`, {
     method: "POST",
@@ -86,7 +94,9 @@ export async function streamAnswer(
     },
     body: JSON.stringify({
       question,
-      conversation_id: conversationId ?? null
+      conversation_id: conversationId ?? null,
+      top_k: typeof topK === "number" ? topK : undefined,
+      provider
     }),
     signal
   });
@@ -195,7 +205,7 @@ export async function fetchConversations(): Promise<ConversationListResponse> {
 }
 
 export async function createConversation(
-  payload: { title?: string | null }
+  payload: { title?: string | null; provider: { id: string; name: string; model?: string | null } }
 ): Promise<ConversationDetail> {
   const response = await fetch(`${API_BASE}/conversations`, {
     method: "POST",

@@ -1,7 +1,21 @@
-﻿import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Edit2, Eraser, Loader2, MoreHorizontal, Plus, Send, Square, Trash2 } from "lucide-react";
-import MessageBubble from "./MessageBubble";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Edit2,
+  Eraser,
+  KeyRound,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  Send,
+  Square,
+  Trash2
+} from "lucide-react";
+
 import type { ChatController } from "@/hooks/useChat";
+import { useProviderStore } from "@/store/providers";
+import type { ProviderId } from "@/types";
+import MessageBubble from "./MessageBubble";
+import { ProviderSettingsModal } from "./ProviderSettingsModal";
 
 interface ChatWindowProps {
   chat: ChatController;
@@ -10,11 +24,25 @@ interface ChatWindowProps {
 export default function ChatWindow({ chat }: ChatWindowProps) {
   const [input, setInput] = useState("");
   const [isActionsOpen, setIsActionsOpen] = useState(false);
+  const [isProviderModalOpen, setProviderModalOpen] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
+
   const activeConversation = useMemo(
     () => chat.conversations.find((item) => item.id === chat.activeConversationId) ?? null,
     [chat.conversations, chat.activeConversationId]
+  );
+
+  const providerDefinitions = useProviderStore((state) => state.definitions);
+  const activeProviderId = useProviderStore((state) => state.activeProviderId);
+  const setActiveProvider = useProviderStore((state) => state.setActiveProvider);
+  const getRuntimeConfig = useProviderStore((state) => state.getRuntimeConfig);
+  const providersReady = useProviderStore((state) => state.ready);
+  const providerLoading = useProviderStore((state) => state.loading);
+  const providerSecrets = useProviderStore((state) => state.secrets);
+  const activeProviderConfig = useMemo(
+    () => getRuntimeConfig(activeProviderId),
+    [activeProviderId, getRuntimeConfig, providerSecrets]
   );
 
   useEffect(() => {
@@ -85,7 +113,7 @@ export default function ChatWindow({ chat }: ChatWindowProps) {
     <main className="flex flex-1 flex-col bg-slate-900/60">
       <header className="border-b border-slate-800 bg-slate-900/80 px-8 py-5 backdrop-blur">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold text-slate-100">
                 Personal Knowledge Assistant
@@ -94,51 +122,88 @@ export default function ChatWindow({ chat }: ChatWindowProps) {
                 Manage conversations and ask questions grounded in your private documents.
               </p>
             </div>
-            <div className="relative" ref={actionsRef}>
-              <button
-                type="button"
-                onClick={() => setIsActionsOpen((prev) => !prev)}
-                className="inline-flex items-center gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-1  text-sm text-accent transition hover:bg-accent/20"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-              {isActionsOpen ? (
-                <div className="absolute right-0 z-400000 mt-2 w-32 rounded-lg border border-slate-700 bg-slate-900/95 p-2 shadow-xl">
-                  <button
-                    title='New conversation'
-                    type="button"
-                    onClick={handleCreateConversation}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800/70"
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs text-slate-500">Default provider:</label>
+                <div className="relative">
+                  <select
+                    className="min-w-[220px] rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none"
+                    value={activeProviderId}
+                    disabled={providerLoading || !providersReady}
+                    onChange={(event) =>
+                      void setActiveProvider(event.target.value as ProviderId)
+                    }
                   >
-                    <Plus className="h-4 w-4 text-accent" />
-                    New
-                  </button>
-                  <button
-                    title='Delete current'
-                    type="button"
-                    onClick={handleDeleteConversation}
-                    disabled={!chat.activeConversationId}
-                    className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClearConversations}
-                    disabled={chat.conversations.length === 0}
-                    className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Eraser className="h-4 w-4" />
-                    Clear all
-                  </button>
+                    {providerDefinitions.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.label}
+                      </option>
+                    ))}
+                  </select>
+                  {providerLoading ? (
+                    <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-accent" />
+                  ) : null}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setProviderModalOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/10 px-3 py-1 text-xs text-accent transition hover:bg-accent/20"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  Manage APIs
+                </button>
+                <div className="relative" ref={actionsRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsActionsOpen((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-1 text-sm text-accent transition hover:bg-accent/20"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                  {isActionsOpen ? (
+                    <div className="absolute right-0 z-10 mt-2 w-36 rounded-lg border border-slate-700 bg-slate-900/95 p-2 shadow-xl">
+                      <button
+                        title="New conversation"
+                        type="button"
+                        onClick={handleCreateConversation}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800/70"
+                      >
+                        <Plus className="h-4 w-4 text-accent" />
+                        New
+                      </button>
+                      <button
+                        title="Delete current"
+                        type="button"
+                        onClick={handleDeleteConversation}
+                        disabled={!chat.activeConversationId}
+                        className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearConversations}
+                        className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800/70"
+                      >
+                        <Eraser className="h-4 w-4" />
+                        Clear all
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              {!activeProviderConfig ? (
+                <span className="text-xs text-red-400">
+                  API key missing for the selected provider. Open “Manage APIs” to configure it.
+                </span>
               ) : null}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="text-sm text-slate-400">Active conversation:</label>
+
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500">Active conversation:</label>
               <div className="relative">
                 <select
                   className="min-w-[220px] rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none"
@@ -175,6 +240,22 @@ export default function ChatWindow({ chat }: ChatWindowProps) {
               <span className="text-xs text-slate-500">
                 {chat.conversations.length} conversation(s)
               </span>
+            </div>
+            <div className="text-xs text-slate-500">
+              {activeConversation ? (
+                <span>
+                  Provider:{" "}
+                  <span className="text-slate-200">{activeConversation.provider.name}</span>
+                  {activeConversation.provider.model ? (
+                    <span className="text-slate-400">
+                      {" · "}
+                      {activeConversation.provider.model}
+                    </span>
+                  ) : null}
+                </span>
+              ) : (
+                <span>No active conversation selected.</span>
+              )}
             </div>
           </div>
         </div>
@@ -247,6 +328,8 @@ export default function ChatWindow({ chat }: ChatWindowProps) {
           </div>
         </div>
       </form>
+
+      <ProviderSettingsModal open={isProviderModalOpen} onClose={() => setProviderModalOpen(false)} />
     </main>
   );
 }

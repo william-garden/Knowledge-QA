@@ -1,0 +1,19 @@
+{
+  "name": "knowledge-qa-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "lint": "tauri lint",
+    "dev:web": "node ./scripts/dev-web.js",
+    "build:web": "node ./scripts/build-web.js",
+    "preview": "node ./scripts/dev-web.js"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5.9"
+  },
+  "dependencies": {
+    "vite": "^7.1.11"
+  }
+}

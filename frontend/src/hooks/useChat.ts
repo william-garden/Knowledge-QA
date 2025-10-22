@@ -9,7 +9,8 @@ import {
   renameConversation as renameConversationApi,
   streamAnswer
 } from "@/lib/api";
-import type { ChatMessage, ConversationSummary } from "@/types";
+import { useProviderStore } from "@/store/providers";
+import type { ChatMessage, ConversationSummary, ProviderRuntimeRequest } from "@/types";
 
 const DEFAULT_TITLE = "New conversation";
 
@@ -38,6 +39,16 @@ export function useChat() {
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const providersReady = useProviderStore((state) => state.ready);
+  const loadProviders = useProviderStore((state) => state.load);
+  const getRuntimeConfig = useProviderStore((state) => state.getRuntimeConfig);
+  const activeProviderId = useProviderStore((state) => state.activeProviderId);
+
+  useEffect(() => {
+    if (!providersReady) {
+      void loadProviders();
+    }
+  }, [providersReady, loadProviders]);
 
   const loadConversation = useCallback(async (conversationId: string) => {
     setIsLoadingMessages(true);
@@ -88,21 +99,29 @@ export function useChat() {
   }, [initialize]);
 
   const ensureConversation = useCallback(
-    async (question: string) => {
+    async (question: string, runtime: ProviderRuntimeRequest) => {
       if (activeConversationId) {
         return activeConversationId;
       }
       const title = deriveTitle(question);
-      const detail = await createConversation({ title });
+      const detail = await createConversation({
+        title,
+        provider: {
+          id: runtime.id,
+          name: runtime.label ?? runtime.id,
+          model: runtime.model ?? null
+        }
+      });
       const {
-        conversation: { id, created_at, updated_at, title: storedTitle }
+        conversation: { id, created_at, updated_at, title: storedTitle, provider }
       } = detail;
       setConversations((prev) => [
         {
           id,
           title: storedTitle,
           created_at,
-          updated_at
+          updated_at,
+          provider
         },
         ...prev
       ]);
@@ -134,12 +153,29 @@ export function useChat() {
       const trimmed = question.trim();
       if (!trimmed) return;
 
+      if (!providersReady) {
+        await loadProviders();
+      }
+
+      const currentConversation = activeConversationId
+        ? conversations.find((item) => item.id === activeConversationId) ?? null
+        : null;
+
+      const runtime = currentConversation
+        ? getRuntimeConfig(currentConversation.provider.id)
+        : getRuntimeConfig(activeProviderId);
+
+      if (!runtime) {
+        toast.error("请先在 API 管理界面配置所选模型的 API Key。");
+        return;
+      }
+
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
       try {
-        let conversationId = await ensureConversation(trimmed);
+        let conversationId = await ensureConversation(trimmed, runtime);
 
         const userMessage = createMessage("user", trimmed);
         const assistantMessage = createMessage("assistant", "");
@@ -158,6 +194,7 @@ export function useChat() {
         const resolvedConversationId = await streamAnswer(
           trimmed,
           conversationId,
+          runtime,
           (chunk) => {
             setMessages((prev) =>
               prev.map((msg) =>
@@ -199,8 +236,17 @@ export function useChat() {
         abortRef.current = null;
       }
     },
-    [ensureConversation, updateConversationSummary]
-  );
+      [
+        activeConversationId,
+        activeProviderId,
+        conversations,
+        ensureConversation,
+        getRuntimeConfig,
+        loadProviders,
+        providersReady,
+        updateConversationSummary
+      ]
+    );
 
   const stop = useCallback(() => {
     if (abortRef.current) {
@@ -263,12 +309,27 @@ export function useChat() {
 
   const handleCreateConversation = useCallback(async () => {
     try {
-      const detail = await createConversation({ title: DEFAULT_TITLE });
+      if (!providersReady) {
+        await loadProviders();
+      }
+      const runtime = getRuntimeConfig(activeProviderId);
+      if (!runtime) {
+        toast.error("请先为当前模型配置 API Key。");
+        return;
+      }
+      const detail = await createConversation({
+        title: DEFAULT_TITLE,
+        provider: {
+          id: runtime.id,
+          name: runtime.label ?? runtime.id,
+          model: runtime.model ?? null
+        }
+      });
       const {
-        conversation: { id, title, created_at, updated_at }
+        conversation: { id, title, created_at, updated_at, provider }
       } = detail;
       setConversations((prev) => [
-        { id, title, created_at, updated_at },
+        { id, title, created_at, updated_at, provider },
         ...prev
       ]);
       setActiveConversationId(id);
@@ -278,7 +339,7 @@ export function useChat() {
         error instanceof Error ? error.message : "Failed to create conversation.";
       toast.error(message);
     }
-  }, []);
+  }, [activeProviderId, getRuntimeConfig, loadProviders, providersReady]);
 
   const handleRenameConversation = useCallback(
     async (conversationId: string, title: string) => {

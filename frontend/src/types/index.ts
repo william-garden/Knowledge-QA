@@ -22,10 +22,44 @@ export type ChatMessage = {
   createdAt: number;
 };
 
+export type ProviderId = "doubao" | "chatgpt" | "gemini" | "grok";
+
+export type ProviderDefinition = {
+  id: ProviderId;
+  label: string;
+  description: string;
+  defaultModel: string;
+  defaultBaseUrl: string;
+  docUrl?: string;
+};
+
+export type ProviderSecret = {
+  providerId: ProviderId;
+  apiKey: string;
+  baseUrl?: string | null;
+  model?: string | null;
+  organization?: string | null;
+};
+
+export type ProviderRuntimeRequest = {
+  id: ProviderId;
+  label?: string | null;
+  model?: string | null;
+  api_key: string;
+  base_url?: string | null;
+};
+
+export type ConversationProvider = {
+  id: ProviderId;
+  name: string;
+  model?: string | null;
+};
+
 export type ChatRequestBody = {
   question: string;
   top_k?: number;
   conversation_id?: string | null;
+  provider: ProviderRuntimeRequest;
 };
 
 export type UploadResponse = {
@@ -44,6 +78,7 @@ export type ConversationSummary = {
   title: string;
   created_at: string;
   updated_at: string;
+  provider: ConversationProvider;
 };
 
 export type ConversationDetail = {
@@ -52,6 +87,7 @@ export type ConversationDetail = {
     title: string;
     created_at: string;
     updated_at: string;
+    provider: ConversationProvider;
     messages: ConversationMessage[];
   };
 };
