@@ -2,7 +2,7 @@ use std::{
     env,
     fs,
     net::TcpStream,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Child, Command, Stdio},
     thread,
     time::{Duration, Instant},
@@ -79,7 +79,7 @@ impl BackendManager {
             }
         }
 
-        let mut child = self.spawn_process()?;
+        let child = self.spawn_process()?;
         let pid = child.id();
 
         self.wait_until_ready()?;
@@ -91,8 +91,8 @@ impl BackendManager {
     }
 
     pub fn status(&self) -> BackendStatus {
-        let guard = self.child.lock();
-        if let Some(child) = guard.as_ref() {
+        let mut guard = self.child.lock();
+        if let Some(child) = guard.as_mut() {
             if child.try_wait().ok().flatten().is_none() {
                 return self.status_inner(true, child.id());
             }

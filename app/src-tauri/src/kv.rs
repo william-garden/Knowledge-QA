@@ -114,7 +114,7 @@ impl ProviderVault {
                     write_json_file(&self.path, &*guard)?;
                     Ok(Some(id))
                 } else {
-                    anyhow::bail!("Provider `{}` not found", id);
+                    bail!("Provider `{}` not found", id);
                 }
             }
             None => {

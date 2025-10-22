@@ -100,7 +100,7 @@ fn initialize(app: &mut tauri::App) -> Result<()> {
     let secrets_dir = data_dir.join("secrets");
     let provider_vault = ProviderVault::new(secrets_dir)?;
 
-    let backend_dir = resolve_backend_dir(handle)?;
+    let backend_dir = resolve_backend_dir(&handle)?;
     let backend_state_dir = data_dir.join("backend");
     fs::create_dir_all(&backend_state_dir)
         .with_context(|| format!("Failed to create backend state dir `{}`", backend_state_dir.display()))?;
@@ -127,8 +127,6 @@ fn initialize(app: &mut tauri::App) -> Result<()> {
 
 fn main() -> Result<()> {
     tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| initialize(app).map_err(|err| err.into()))
         .invoke_handler(tauri::generate_handler![
             get_backend_status,
@@ -147,6 +145,6 @@ fn main() -> Result<()> {
                 }
             }
         })
-        .run(tauri::generate_context!())
+        .run(tauri::generate_context!("tauri.conf.json"))
         .map_err(|err| err.into())
 }
