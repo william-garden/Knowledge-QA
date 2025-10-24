@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.core.config import Settings
-from app.dependencies import get_app_settings, get_metadata_store
+from app.dependencies import get_metadata_store, get_runtime_settings
 from app.schemas.knowledge import KnowledgeChunksResponse, KnowledgeListResponse
 from app.services.metadata import MetadataStore
 from app.services.vector_store import get_vector_store
@@ -21,7 +21,7 @@ async def knowledge_base(metadata_store: MetadataStore = Depends(get_metadata_st
 async def knowledge_chunks(
     document_id: str,
     metadata_store: MetadataStore = Depends(get_metadata_store),
-    settings: Settings = Depends(get_app_settings)
+    settings: Settings = Depends(get_runtime_settings)
 ) -> KnowledgeChunksResponse:
     documents = metadata_store.list()
     if not any(doc.id == document_id for doc in documents):
@@ -49,7 +49,7 @@ async def knowledge_chunks(
 async def delete_document(
     document_id: str,
     metadata_store: MetadataStore = Depends(get_metadata_store),
-    settings: Settings = Depends(get_app_settings)
+    settings: Settings = Depends(get_runtime_settings)
 ) -> Response:
     document = metadata_store.remove(document_id)
     if document is None:
@@ -67,7 +67,7 @@ async def delete_document(
 @router.delete("/knowledge-base", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_all_documents(
     metadata_store: MetadataStore = Depends(get_metadata_store),
-    settings: Settings = Depends(get_app_settings)
+    settings: Settings = Depends(get_runtime_settings)
 ) -> Response:
     documents = metadata_store.list()
     if not documents:

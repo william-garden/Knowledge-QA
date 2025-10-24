@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app.core.config import Settings
-from app.dependencies import get_app_settings, get_conversation_store
+from app.dependencies import get_conversation_store, get_runtime_settings
 from app.schemas.qa import QuestionRequest
 from app.schemas.qa import QuestionRequest
 from app.services.conversations import ConversationStore, new_message
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.post("/qa")
 async def ask_question(
     payload: QuestionRequest,
-    settings: Settings = Depends(get_app_settings),
+    settings: Settings = Depends(get_runtime_settings),
     conversation_store: ConversationStore = Depends(get_conversation_store)
 ) -> StreamingResponse:
     conversation_id = payload.conversation_id
